@@ -31,4 +31,8 @@ Claude Code から GitHub を参照できるようにするための、要件・
 
 ## 3. 設計
 
+- github-mcp-serverのバイナリファイルをプラグイン内に含めて配布する
+- githubアクセスを行うときはgithub-mcp-serverを使うようにするスキルをプラグイン内に定義する
+- github-mcp-serverを迂回してpushすること（gitコマンドやghコマンドを使用するなど）を防ぐため、ガードレールとしてhooksをプラグイン内に定義する
+
 ## 4. 運用
