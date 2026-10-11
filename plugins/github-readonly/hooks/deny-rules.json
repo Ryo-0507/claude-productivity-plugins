@@ -1,0 +1,4 @@
+{
+  "reason": "Blocked by the github-readonly plugin: writing to GitHub with git push or the gh CLI is not allowed. Use the read-only tools of the github MCP server provided by this plugin to access GitHub.",
+  "commands": ["git push *", "git * push *", "gh *"]
+}

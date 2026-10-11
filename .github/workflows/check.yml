@@ -1,0 +1,21 @@
+name: check
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  github-readonly:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: OS 別の zip をビルドする（公式チェックサムを照合）
+        run: python3 plugins/github-readonly/tools/build.py build --out dist
+
+      - name: github-mcp-server が読み取り専用ツールだけを提供することを確認する
+        run: python3 plugins/github-readonly/tools/build.py verify-readonly
