@@ -10,6 +10,7 @@ Python の標準ライブラリだけで動作する。
 """
 
 import argparse
+import base64
 import hashlib
 import io
 import json
@@ -110,7 +111,11 @@ def hooks_config(shell: str) -> dict:
     if "'" in reason:
         raise SystemExit("deny-rules.json の reason にシングルクォートは使えません")
     if shell == "powershell":
-        command = f"[Console]::Error.WriteLine('{reason}'); exit 2"
+        # PowerShell のスクリプトやコンソールの文字コードで日本語が化けないよう、
+        # メッセージは UTF-8 を Base64 にして埋め込み、バイト列のまま標準エラー出力に書き込む
+        encoded = base64.b64encode(reason.encode("utf-8")).decode("ascii")
+        command = (f"$b = [Convert]::FromBase64String('{encoded}'); "
+                   "[Console]::OpenStandardError().Write($b, 0, $b.Length); exit 2")
     else:
         command = f"echo '{reason}' >&2; exit 2"
 
