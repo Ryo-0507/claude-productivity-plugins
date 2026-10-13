@@ -1,14 +1,16 @@
-name: release
+name: github-readonly-release
 
 on:
   push:
     branches: [main]
+    paths:
+      - plugins/github-readonly/**
 
 permissions:
   contents: read
 
 concurrency:
-  group: release
+  group: github-readonly-release
   cancel-in-progress: false
 
 jobs:

@@ -1,9 +1,15 @@
-name: check
+name: github-readonly-check
 
 on:
   pull_request:
+    paths:
+      - plugins/github-readonly/**
+      - .github/workflows/github-readonly-check.yml
   push:
     branches: [main]
+    paths:
+      - plugins/github-readonly/**
+      - .github/workflows/github-readonly-check.yml
 
 permissions:
   contents: read
