@@ -4,12 +4,12 @@ on:
   pull_request:
     paths:
       - plugins/github-readonly/**
-      - .github/workflows/github-readonly-check.yml
+      - .github/workflows/github-readonly-*
   push:
     branches: [main]
     paths:
       - plugins/github-readonly/**
-      - .github/workflows/github-readonly-check.yml
+      - .github/workflows/github-readonly-*
 
 permissions:
   contents: read
