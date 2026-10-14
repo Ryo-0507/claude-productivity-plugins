@@ -87,3 +87,16 @@ jobs:
             --dist dist --repo "$GITHUB_REPOSITORY" --tag "$TAG" > pr-body.md
           gh pr create --repo "$GITHUB_REPOSITORY" --base main --head "$BRANCH" \
             --title "chore(marketplace): publish ${TAG}" --body-file pr-body.md
+
+      # 古いバージョンの PR を後からマージすると配信中のバージョンが巻き戻るため、新しい PR で置き換えたものは閉じる
+      - name: 未マージの古い marketplace.json 更新 PR を閉じる
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          BRANCH: marketplace/${{ needs.release-please.outputs.tag_name }}
+        run: |
+          gh pr list --repo "$GITHUB_REPOSITORY" --state open --base main --json number,headRefName \
+            --jq ".[] | select(.headRefName | startswith(\"marketplace/github-readonly-v\")) | select(.headRefName != \"${BRANCH}\") | .number" |
+          while read -r number; do
+            gh pr close "$number" --repo "$GITHUB_REPOSITORY" --delete-branch \
+              --comment "新しいリリース ${TAG} の PR に置き換えたため閉じます。"
+          done
