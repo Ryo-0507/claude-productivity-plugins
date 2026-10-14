@@ -1,0 +1,4 @@
+# 利用者への配信（marketplace.json）と、リリースの仕組み（ワークフロー）の変更にはメンテナーの承認を必須にする
+/.claude-plugin/marketplace.json @Ryo-0507
+/.github/workflows/ @Ryo-0507
+/.github/CODEOWNERS @Ryo-0507

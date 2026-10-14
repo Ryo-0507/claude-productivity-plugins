@@ -1,0 +1,41 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended",
+    "helpers:pinGitHubActionDigests"
+  ],
+  "semanticCommits": "enabled",
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "github-readonly プラグインに同梱する github-mcp-server のバージョン",
+      "managerFilePatterns": [
+        "/^plugins/github-readonly/versions\\.env$/"
+      ],
+      "matchStrings": [
+        "# renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)\\n\\w+=(?<currentValue>\\S+)"
+      ]
+    }
+  ],
+  "packageRules": [
+    {
+      "description": "github-mcp-server の更新はパッチリリースとして配信し、マイナー・パッチは自動マージする",
+      "matchDepNames": [
+        "github/github-mcp-server"
+      ],
+      "minimumReleaseAge": "3 days",
+      "semanticCommitType": "fix",
+      "semanticCommitScope": "deps"
+    },
+    {
+      "matchDepNames": [
+        "github/github-mcp-server"
+      ],
+      "matchUpdateTypes": [
+        "minor",
+        "patch"
+      ],
+      "automerge": true
+    }
+  ]
+}

@@ -6,16 +6,5 @@
   "metadata": {
     "description": "業務効率化のための Claude Code プラグイン集"
   },
-  "plugins": [
-    {
-      "name": "github-windows",
-      "source": "./plugins/github-windows",
-      "description": "【Windows用】GitHub公式MCPサーバーでGitHubのリポジトリを参照する"
-    },
-    {
-      "name": "github-mac",
-      "source": "./plugins/github-mac",
-      "description": "【Mac用】GitHub公式MCPサーバーでGitHubのリポジトリを参照する"
-    }
-  ]
+  "plugins": []
 }

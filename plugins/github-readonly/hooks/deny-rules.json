@@ -1,0 +1,8 @@
+{
+  "reason": "github-readonly プラグインにより、git push や gh コマンドでの GitHub への書き込みはブロックされています。GitHub の参照には、このプラグインが提供する github MCP サーバーの読み取り専用ツールを使ってください。",
+  "commands": [
+    "git push *",
+    "git * push *",
+    "gh *"
+  ]
+}
