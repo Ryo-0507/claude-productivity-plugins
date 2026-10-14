@@ -49,7 +49,6 @@ jobs:
     env:
       TAG: ${{ needs.release-please.outputs.tag_name }}
       VERSION: ${{ needs.release-please.outputs.version }}
-      GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -59,17 +58,32 @@ jobs:
         run: python3 plugins/github-readonly/tools/build.py build --out dist --version "$VERSION"
 
       - name: zip をリリースに添付する
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: gh release upload "$TAG" dist/*.zip --repo "$GITHUB_REPOSITORY"
 
-      # zip の公開後に marketplace.json を更新する。GITHUB_TOKEN で push するため、このコミットではワークフローが再起動しない
-      - name: marketplace.json を更新して main にコミットする
+      # marketplace.json の変更はメンテナーの承認を必須にするため、main へ直接 push せず PR を作る
+      - uses: actions/create-github-app-token@v3
+        id: app-token
+        with:
+          client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+
+      - name: marketplace.json を更新する PR を作る
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          BRANCH: marketplace/${{ needs.release-please.outputs.tag_name }}
         run: |
           git fetch origin main
-          git checkout -B main origin/main
+          git checkout -B "$BRANCH" origin/main
           python3 plugins/github-readonly/tools/build.py update-marketplace \
             --dist dist --repo "$GITHUB_REPOSITORY" --tag "$TAG"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add .claude-plugin/marketplace.json
-          git commit -m "chore: publish ${TAG} to marketplace"
-          git push origin main || (git pull --rebase origin main && git push origin main)
+          git commit -m "chore(marketplace): publish ${TAG}"
+          git push origin "HEAD:refs/heads/${BRANCH}"
+          python3 plugins/github-readonly/tools/build.py marketplace-pr-body \
+            --dist dist --repo "$GITHUB_REPOSITORY" --tag "$TAG" > pr-body.md
+          gh pr create --repo "$GITHUB_REPOSITORY" --base main --head "$BRANCH" \
+            --title "chore(marketplace): publish ${TAG}" --body-file pr-body.md

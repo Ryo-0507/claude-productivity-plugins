@@ -1,0 +1,3 @@
+# marketplace.json の変更（利用者への配信）にはメンテナーの承認を必須にする
+/.claude-plugin/marketplace.json @Ryo-0507
+/.github/CODEOWNERS @Ryo-0507

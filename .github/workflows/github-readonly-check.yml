@@ -5,11 +5,13 @@ on:
     paths:
       - plugins/github-readonly/**
       - .github/workflows/github-readonly-*
+      - .claude-plugin/marketplace.json
   push:
     branches: [main]
     paths:
       - plugins/github-readonly/**
       - .github/workflows/github-readonly-*
+      - .claude-plugin/marketplace.json
 
 permissions:
   contents: read
@@ -25,3 +27,6 @@ jobs:
 
       - name: github-mcp-server が読み取り専用ツールだけを提供することを確認する
         run: python3 plugins/github-readonly/tools/build.py verify-readonly
+
+      - name: marketplace.json が指す zip の sha256 と中身を確認する
+        run: python3 plugins/github-readonly/tools/build.py verify-marketplace

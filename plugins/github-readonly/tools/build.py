@@ -5,6 +5,8 @@
   build               OS 別の zip を作成し、dist/ に出力する
   verify-readonly     github-mcp-server が読み取り専用ツールだけを提供することを確認する
   update-marketplace  marketplace.json に OS 別プラグインのエントリを書き込む
+  marketplace-pr-body marketplace.json を更新する PR の本文を出力する
+  verify-marketplace  marketplace.json が指す zip の sha256 と中身を確認する
 
 Python の標準ライブラリだけで動作する。
 """
@@ -263,6 +265,43 @@ def cmd_update_marketplace(args: argparse.Namespace) -> None:
     MARKETPLACE_JSON.write_text(json.dumps(marketplace, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
+def cmd_marketplace_pr_body(args: argparse.Namespace) -> None:
+    builds = json.loads((Path(args.dist) / "builds.json").read_text(encoding="utf-8"))
+    release_url = f"https://github.com/{args.repo}/releases/tag/{args.tag}"
+    lines = [
+        f"[{args.tag}]({release_url}) の zip を marketplace.json に登録します。",
+        "",
+        "このPRをマージすると、自動更新を ON にしている利用者に新しいバージョンが配信されます。",
+        "承認する前に、リリースノートで今回のリリースに含まれる変更を確認してください。",
+        "",
+        "| プラグイン | zip | sha256 |",
+        "| --- | --- | --- |",
+    ]
+    for build in builds:
+        name = PLATFORMS[build["platform"]]["plugin_name"]
+        url = f"https://github.com/{args.repo}/releases/download/{args.tag}/{build['file']}"
+        lines.append(f"| `{name}` | [{build['file']}]({url}) | `{build['sha256']}` |")
+    print("\n".join(lines))
+
+
+def cmd_verify_marketplace(args: argparse.Namespace) -> None:
+    marketplace = json.loads(MARKETPLACE_JSON.read_text(encoding="utf-8"))
+    names = {p["plugin_name"] for p in PLATFORMS.values()}
+    entries = [p for p in marketplace["plugins"] if p["name"] in names]
+    for entry in entries:
+        source = entry["source"]
+        data = download(source["url"])
+        actual = hashlib.sha256(data).hexdigest()
+        if actual != source["sha256"]:
+            raise SystemExit(f"{entry['name']}: sha256 が一致しません（取得値: {actual}）")
+        with zipfile.ZipFile(io.BytesIO(data)) as zf:
+            manifest = json.loads(zf.read(".claude-plugin/plugin.json"))
+        if manifest["name"] != entry["name"]:
+            raise SystemExit(f"{entry['name']}: zip 内のプラグイン名が {manifest['name']} になっています")
+        print(f"{entry['name']}: OK")
+    print(f"{len(entries)} 件のエントリを確認しました")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = parser.add_subparsers(dest="command", required=True)
@@ -280,6 +319,15 @@ def main() -> None:
     update.add_argument("--repo", required=True, help="このリポジトリ（owner/repo）")
     update.add_argument("--tag", required=True, help="zip を添付したリリースのタグ")
     update.set_defaults(func=cmd_update_marketplace)
+
+    pr_body = sub.add_parser("marketplace-pr-body", help="marketplace.json を更新する PR の本文を出力する")
+    pr_body.add_argument("--dist", default="dist", help="build の出力先ディレクトリ")
+    pr_body.add_argument("--repo", required=True, help="このリポジトリ（owner/repo）")
+    pr_body.add_argument("--tag", required=True, help="zip を添付したリリースのタグ")
+    pr_body.set_defaults(func=cmd_marketplace_pr_body)
+
+    verify_mp = sub.add_parser("verify-marketplace", help="marketplace.json が指す zip を確認する")
+    verify_mp.set_defaults(func=cmd_verify_marketplace)
 
     args = parser.parse_args()
     args.func(args)
