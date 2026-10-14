@@ -29,27 +29,31 @@ REPO_ROOT = SOURCE_DIR.parent.parent
 MARKETPLACE_JSON = REPO_ROOT / ".claude-plugin" / "marketplace.json"
 UPSTREAM_REPO = "github/github-mcp-server"
 MCP_SERVER_NAME = "github"
+# 利用者の PC での起動と CI での検査の両方で使う、github-mcp-server の起動引数
+MCP_SERVER_ARGS = ["stdio", "--read-only"]
+# github-mcp-server の公式リリースを作るワークフロー（ビルド来歴の検証に使う）
+UPSTREAM_SIGNER_WORKFLOW = f"{UPSTREAM_REPO}/.github/workflows/goreleaser.yml"
 # github-mcp-server のライセンス一式を置く、zip 内（プラグインのルートからの）パス
 LICENSES_DIR = "licenses/github-mcp-server"
 
 PLATFORMS = {
     "windows": {
         "plugin_name": "github-readonly-windows",
-        "description": "【Windows用】GitHub公式MCPサーバーで、GitHubのリポジトリを読み取り専用で参照する",
+        "description": "【Windows用】GitHubのリポジトリを読み取り専用で参照する。GitHub公式のgithub-mcp-serverを同梱（GitHubによる提供ではありません）",
         "asset": "github-mcp-server_Windows_x86_64.zip",
         "binary": "github-mcp-server.exe",
         "hook_shell": "powershell",
     },
     "mac-apple-silicon": {
         "plugin_name": "github-readonly-mac-apple-silicon",
-        "description": "【Mac・Appleシリコン用（「このMacについて」に「チップ」と表示される方）】GitHub公式MCPサーバーで、GitHubのリポジトリを読み取り専用で参照する",
+        "description": "【Mac・Appleシリコン用（「このMacについて」に「チップ」と表示される方）】GitHubのリポジトリを読み取り専用で参照する。GitHub公式のgithub-mcp-serverを同梱（GitHubによる提供ではありません）",
         "asset": "github-mcp-server_Darwin_arm64.tar.gz",
         "binary": "github-mcp-server",
         "hook_shell": "bash",
     },
     "mac-intel": {
         "plugin_name": "github-readonly-mac-intel",
-        "description": "【Mac・Intel用（「このMacについて」に「プロセッサ」と表示される方）】GitHub公式MCPサーバーで、GitHubのリポジトリを読み取り専用で参照する",
+        "description": "【Mac・Intel用（「このMacについて」に「プロセッサ」と表示される方）】GitHubのリポジトリを読み取り専用で参照する。GitHub公式のgithub-mcp-serverを同梱（GitHubによる提供ではありません）",
         "asset": "github-mcp-server_Darwin_x86_64.tar.gz",
         "binary": "github-mcp-server",
         "hook_shell": "bash",
@@ -87,12 +91,24 @@ def fetch_checksums(version: str) -> dict:
     return checksums
 
 
-def fetch_upstream_files(version: str, asset: str, checksums: dict) -> dict:
-    """公式リリースのアーカイブを取得してチェックサムを照合し、{ファイル名: 中身} を返す。"""
+def verify_attestation(version: str, asset: str, data: bytes) -> None:
+    """公式のリリース用ワークフローがビルドしたものであることを、ビルド来歴の証明（artifact attestation）で確認する。"""
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp) / asset
+        path.write_bytes(data)
+        subprocess.run(["gh", "attestation", "verify", str(path), "--repo", UPSTREAM_REPO,
+                        "--signer-workflow", UPSTREAM_SIGNER_WORKFLOW,
+                        "--source-ref", f"refs/tags/{version}"], check=True)
+
+
+def fetch_upstream_files(version: str, asset: str, checksums: dict, attest: bool) -> dict:
+    """公式リリースのアーカイブを取得して検証し、{ファイル名: 中身} を返す。"""
     data = download(f"https://github.com/{UPSTREAM_REPO}/releases/download/{version}/{asset}")
     actual = hashlib.sha256(data).hexdigest()
     if checksums.get(asset) != actual:
         raise SystemExit(f"{asset} のチェックサムが公式の値と一致しません（取得値: {actual}）")
+    if attest:
+        verify_attestation(version, asset, data)
 
     files = {}
     if asset.endswith(".zip"):
@@ -167,12 +183,13 @@ def plugin_files(platform: dict, upstream: dict, third_party: dict, version: str
             "mcpServers": {
                 MCP_SERVER_NAME: {
                     "command": f"${{CLAUDE_PLUGIN_ROOT}}/mcp-server/{binary}",
-                    "args": ["stdio", "--read-only"],
+                    "args": MCP_SERVER_ARGS,
                 },
             },
         }, indent=2),
         "hooks/hooks.json": json.dumps(hooks_config(platform["hook_shell"]), indent=2),
         f"mcp-server/{binary}": (upstream[binary], True),
+        "LICENSE": (REPO_ROOT / "LICENSE").read_bytes(),
         f"{LICENSES_DIR}/LICENSE": upstream["LICENSE"],
     }
     for name, content in third_party.items():
@@ -212,7 +229,7 @@ def cmd_build(args: argparse.Namespace) -> None:
 
     builds = []
     for key, platform in PLATFORMS.items():
-        upstream = fetch_upstream_files(version, platform["asset"], checksums)
+        upstream = fetch_upstream_files(version, platform["asset"], checksums, args.verify_attestations)
         zip_path = out_dir / f"{platform['plugin_name']}.zip"
         write_zip(zip_path, plugin_files(platform, upstream, third_party, args.version))
         digest = hashlib.sha256(zip_path.read_bytes()).hexdigest()
@@ -233,7 +250,7 @@ def mcp_tools(binary: Path) -> list:
     ]
     env = {k: v for k, v in os.environ.items()
            if k not in ("GITHUB_PERSONAL_ACCESS_TOKEN", "GITHUB_TOKEN", "GH_TOKEN")}
-    proc = subprocess.Popen([str(binary), "stdio", "--read-only"], stdin=subprocess.PIPE,
+    proc = subprocess.Popen([str(binary), *MCP_SERVER_ARGS], stdin=subprocess.PIPE,
                             stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, env=env, text=True)
     try:
         for req in requests:
@@ -250,7 +267,7 @@ def mcp_tools(binary: Path) -> list:
 
 def cmd_verify_readonly(args: argparse.Namespace) -> None:
     version = upstream_version()
-    upstream = fetch_upstream_files(version, VERIFY_ASSET, fetch_checksums(version))
+    upstream = fetch_upstream_files(version, VERIFY_ASSET, fetch_checksums(version), args.verify_attestations)
     with tempfile.TemporaryDirectory() as tmp:
         binary = Path(tmp) / "github-mcp-server"
         binary.write_bytes(upstream["github-mcp-server"])
@@ -287,14 +304,31 @@ def cmd_update_marketplace(args: argparse.Namespace) -> None:
     MARKETPLACE_JSON.write_text(json.dumps(marketplace, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
+def published_tag() -> str | None:
+    """marketplace.json で現在配信している github-readonly のタグを返す。未配信なら None。"""
+    marketplace = json.loads(MARKETPLACE_JSON.read_text(encoding="utf-8"))
+    names = {p["plugin_name"] for p in PLATFORMS.values()}
+    for entry in marketplace["plugins"]:
+        if entry["name"] in names:
+            return entry["source"]["url"].split("/releases/download/")[1].split("/")[0]
+    return None
+
+
 def cmd_marketplace_pr_body(args: argparse.Namespace) -> None:
     builds = json.loads((Path(args.dist) / "builds.json").read_text(encoding="utf-8"))
     release_url = f"https://github.com/{args.repo}/releases/tag/{args.tag}"
+    previous = published_tag()
+    if previous:
+        diff = f"前回配信した {previous} からのコードの差分: https://github.com/{args.repo}/compare/{previous}...{args.tag}"
+    else:
+        diff = "初回の配信です。"
     lines = [
         f"[{args.tag}]({release_url}) の zip を marketplace.json に登録します。",
         "",
         "このPRをマージすると、自動更新を ON にしている利用者に新しいバージョンが配信されます。",
-        "承認する前に、リリースノートで今回のリリースに含まれる変更を確認してください。",
+        "リリースノートはコミットメッセージから作られるため、承認する前に、次のリンクで実際のコードの差分を確認してください。",
+        "",
+        diff,
         "",
         "| プラグイン | zip | sha256 |",
         "| --- | --- | --- |",
@@ -331,9 +365,11 @@ def main() -> None:
     build = sub.add_parser("build", help="OS 別の zip を作成する")
     build.add_argument("--out", default="dist", help="出力先ディレクトリ")
     build.add_argument("--version", default="0.0.0-dev", help="プラグインのバージョン")
+    build.add_argument("--verify-attestations", action="store_true", help="github-mcp-server のビルド来歴の証明を gh で検証する")
     build.set_defaults(func=cmd_build)
 
     verify = sub.add_parser("verify-readonly", help="読み取り専用ツールだけが提供されることを確認する")
+    verify.add_argument("--verify-attestations", action="store_true", help="github-mcp-server のビルド来歴の証明を gh で検証する")
     verify.set_defaults(func=cmd_verify_readonly)
 
     update = sub.add_parser("update-marketplace", help="marketplace.json を更新する")

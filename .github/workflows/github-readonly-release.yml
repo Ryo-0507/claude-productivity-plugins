@@ -22,13 +22,13 @@ jobs:
       version: ${{ steps.release.outputs['plugins/github-readonly--version'] }}
     steps:
       # GITHUB_TOKEN で作成・マージした PR やタグでは後続のワークフローが起動しないため、GitHub App のトークンを使う
-      - uses: actions/create-github-app-token@v3
+      - uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         id: app-token
         with:
           client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
           private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
 
-      - uses: googleapis/release-please-action@v5
+      - uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
         id: release
         with:
           token: ${{ steps.app-token.outputs.token }}
@@ -50,12 +50,15 @@ jobs:
       TAG: ${{ needs.release-please.outputs.tag_name }}
       VERSION: ${{ needs.release-please.outputs.version }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ needs.release-please.outputs.tag_name }}
+          persist-credentials: false
 
-      - name: OS 別の zip をビルドする
-        run: python3 plugins/github-readonly/tools/build.py build --out dist --version "$VERSION"
+      - name: OS 別の zip をビルドする（公式のチェックサムとビルド来歴の証明を検証）
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 plugins/github-readonly/tools/build.py build --out dist --version "$VERSION" --verify-attestations
 
       - name: zip をリリースに添付する
         env:
@@ -63,7 +66,7 @@ jobs:
         run: gh release upload "$TAG" dist/*.zip --repo "$GITHUB_REPOSITORY"
 
       # marketplace.json の変更はメンテナーの承認を必須にするため、main へ直接 push せず PR を作る
-      - uses: actions/create-github-app-token@v3
+      - uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         id: app-token
         with:
           client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
@@ -76,17 +79,18 @@ jobs:
         run: |
           git fetch origin main
           git checkout -B "$BRANCH" origin/main
+          # PR 本文の差分リンクには、更新前の marketplace.json にある配信中のタグを使う
+          python3 plugins/github-readonly/tools/build.py marketplace-pr-body \
+            --dist dist --repo "$GITHUB_REPOSITORY" --tag "$TAG" > "$RUNNER_TEMP/pr-body.md"
           python3 plugins/github-readonly/tools/build.py update-marketplace \
             --dist dist --repo "$GITHUB_REPOSITORY" --tag "$TAG"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add .claude-plugin/marketplace.json
           git commit -m "chore(marketplace): publish ${TAG}"
-          git push origin "HEAD:refs/heads/${BRANCH}"
-          python3 plugins/github-readonly/tools/build.py marketplace-pr-body \
-            --dist dist --repo "$GITHUB_REPOSITORY" --tag "$TAG" > pr-body.md
+          git push "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "HEAD:refs/heads/${BRANCH}"
           gh pr create --repo "$GITHUB_REPOSITORY" --base main --head "$BRANCH" \
-            --title "chore(marketplace): publish ${TAG}" --body-file pr-body.md
+            --title "chore(marketplace): publish ${TAG}" --body-file "$RUNNER_TEMP/pr-body.md"
 
       # 古いバージョンの PR を後からマージすると配信中のバージョンが巻き戻るため、新しい PR で置き換えたものは閉じる
       - name: 未マージの古い marketplace.json 更新 PR を閉じる
