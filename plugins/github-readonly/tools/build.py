@@ -29,6 +29,8 @@ REPO_ROOT = SOURCE_DIR.parent.parent
 MARKETPLACE_JSON = REPO_ROOT / ".claude-plugin" / "marketplace.json"
 UPSTREAM_REPO = "github/github-mcp-server"
 MCP_SERVER_NAME = "github"
+# github-mcp-server のライセンス一式を置く、zip 内（プラグインのルートからの）パス
+LICENSES_DIR = "licenses/github-mcp-server"
 
 PLATFORMS = {
     "windows": {
@@ -37,7 +39,6 @@ PLATFORMS = {
         "asset": "github-mcp-server_Windows_x86_64.zip",
         "binary": "github-mcp-server.exe",
         "hook_shell": "powershell",
-        "licenses_os": "windows",
     },
     "mac-apple-silicon": {
         "plugin_name": "github-readonly-mac-apple-silicon",
@@ -45,7 +46,6 @@ PLATFORMS = {
         "asset": "github-mcp-server_Darwin_arm64.tar.gz",
         "binary": "github-mcp-server",
         "hook_shell": "bash",
-        "licenses_os": "darwin",
     },
     "mac-intel": {
         "plugin_name": "github-readonly-mac-intel",
@@ -53,7 +53,6 @@ PLATFORMS = {
         "asset": "github-mcp-server_Darwin_x86_64.tar.gz",
         "binary": "github-mcp-server",
         "hook_shell": "bash",
-        "licenses_os": "darwin",
     },
 }
 
@@ -174,12 +173,10 @@ def plugin_files(platform: dict, upstream: dict, third_party: dict, version: str
         }, indent=2),
         "hooks/hooks.json": json.dumps(hooks_config(platform["hook_shell"]), indent=2),
         f"mcp-server/{binary}": (upstream[binary], True),
-        "mcp-server/LICENSE": upstream["LICENSE"],
-        "mcp-server/third-party-licenses.md": third_party[f"third-party-licenses.{platform['licenses_os']}.md"],
+        f"{LICENSES_DIR}/LICENSE": upstream["LICENSE"],
     }
     for name, content in third_party.items():
-        if name.startswith("third-party/"):
-            files[f"mcp-server/{name}"] = content
+        files[f"{LICENSES_DIR}/{name}"] = content
     for path in sorted((SOURCE_DIR / "skills").rglob("*")):
         if path.is_file():
             files[path.relative_to(SOURCE_DIR).as_posix()] = path.read_bytes()
