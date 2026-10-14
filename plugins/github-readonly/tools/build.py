@@ -98,7 +98,9 @@ def verify_attestation(version: str, asset: str, data: bytes) -> None:
         path.write_bytes(data)
         subprocess.run(["gh", "attestation", "verify", str(path), "--repo", UPSTREAM_REPO,
                         "--signer-workflow", UPSTREAM_SIGNER_WORKFLOW,
-                        "--source-ref", f"refs/tags/{version}"], check=True)
+                        "--source-ref", f"refs/tags/{version}", "--format", "json"],
+                       check=True, stdout=subprocess.DEVNULL)
+    print(f"{asset}: ビルド来歴の証明を確認しました（{UPSTREAM_SIGNER_WORKFLOW}, refs/tags/{version}）")
 
 
 def fetch_upstream_files(version: str, asset: str, checksums: dict, attest: bool) -> dict:
