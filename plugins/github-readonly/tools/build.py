@@ -37,6 +37,7 @@ PLATFORMS = {
         "asset": "github-mcp-server_Windows_x86_64.zip",
         "binary": "github-mcp-server.exe",
         "hook_shell": "powershell",
+        "licenses_os": "windows",
     },
     "mac-apple-silicon": {
         "plugin_name": "github-readonly-mac-apple-silicon",
@@ -44,6 +45,7 @@ PLATFORMS = {
         "asset": "github-mcp-server_Darwin_arm64.tar.gz",
         "binary": "github-mcp-server",
         "hook_shell": "bash",
+        "licenses_os": "darwin",
     },
     "mac-intel": {
         "plugin_name": "github-readonly-mac-intel",
@@ -51,6 +53,7 @@ PLATFORMS = {
         "asset": "github-mcp-server_Darwin_x86_64.tar.gz",
         "binary": "github-mcp-server",
         "hook_shell": "bash",
+        "licenses_os": "darwin",
     },
 }
 
@@ -106,6 +109,23 @@ def fetch_upstream_files(version: str, asset: str, checksums: dict) -> dict:
     return files
 
 
+def fetch_third_party_licenses(version: str) -> dict:
+    """github-mcp-server の該当タグから、同梱ライブラリのライセンス一式を取得し、{パス: 中身} を返す。"""
+    with tempfile.TemporaryDirectory() as tmp:
+        repo = Path(tmp) / "repo"
+        subprocess.run(["git", "-c", "advice.detachedHead=false", "clone", "--quiet", "--depth", "1", "--branch", version, "--filter=blob:none",
+                        "--sparse", f"https://github.com/{UPSTREAM_REPO}.git", str(repo)], check=True)
+        subprocess.run(["git", "-C", str(repo), "sparse-checkout", "set", "--no-cone",
+                        "/third-party/", "/third-party-licenses.*.md"], check=True)
+        files = {}
+        for path in sorted(repo.rglob("*")):
+            if path.is_file() and ".git" not in path.relative_to(repo).parts:
+                files[path.relative_to(repo).as_posix()] = path.read_bytes()
+    if not any(name.startswith("third-party/") for name in files):
+        raise SystemExit(f"{UPSTREAM_REPO} {version} に third-party ディレクトリがありません")
+    return files
+
+
 def hooks_config(shell: str) -> dict:
     """deny-rules.json から、指定したシェル向けの hooks.json の内容を作る。"""
     rules = json.loads((SOURCE_DIR / "hooks" / "deny-rules.json").read_text(encoding="utf-8"))
@@ -133,7 +153,7 @@ def hooks_config(shell: str) -> dict:
     return {"hooks": {"PreToolUse": [{"matcher": "Bash|PowerShell", "hooks": handlers}]}}
 
 
-def plugin_files(platform: dict, upstream: dict, version: str) -> dict:
+def plugin_files(platform: dict, upstream: dict, third_party: dict, version: str) -> dict:
     """zip に格納する {パス: (中身, 実行可能か)} を返す。"""
     binary = platform["binary"]
     files = {
@@ -155,7 +175,11 @@ def plugin_files(platform: dict, upstream: dict, version: str) -> dict:
         "hooks/hooks.json": json.dumps(hooks_config(platform["hook_shell"]), indent=2),
         f"mcp-server/{binary}": (upstream[binary], True),
         "mcp-server/LICENSE": upstream["LICENSE"],
+        "mcp-server/third-party-licenses.md": third_party[f"third-party-licenses.{platform['licenses_os']}.md"],
     }
+    for name, content in third_party.items():
+        if name.startswith("third-party/"):
+            files[f"mcp-server/{name}"] = content
     for path in sorted((SOURCE_DIR / "skills").rglob("*")):
         if path.is_file():
             files[path.relative_to(SOURCE_DIR).as_posix()] = path.read_bytes()
@@ -185,6 +209,7 @@ def write_zip(path: Path, files: dict) -> None:
 def cmd_build(args: argparse.Namespace) -> None:
     version = upstream_version()
     checksums = fetch_checksums(version)
+    third_party = fetch_third_party_licenses(version)
     out_dir = Path(args.out)
     out_dir.mkdir(parents=True, exist_ok=True)
 
@@ -192,7 +217,7 @@ def cmd_build(args: argparse.Namespace) -> None:
     for key, platform in PLATFORMS.items():
         upstream = fetch_upstream_files(version, platform["asset"], checksums)
         zip_path = out_dir / f"{platform['plugin_name']}.zip"
-        write_zip(zip_path, plugin_files(platform, upstream, args.version))
+        write_zip(zip_path, plugin_files(platform, upstream, third_party, args.version))
         digest = hashlib.sha256(zip_path.read_bytes()).hexdigest()
         builds.append({"platform": key, "file": zip_path.name, "sha256": digest})
         print(f"{zip_path.name}  sha256={digest}")
