@@ -3,7 +3,6 @@
   "extends": [
     "config:recommended"
   ],
-  "semanticCommits": "enabled",
   "customManagers": [
     {
       "customType": "regex",
@@ -18,13 +17,11 @@
   ],
   "packageRules": [
     {
-      "description": "github-mcp-server の更新はパッチリリースとして配信し、マイナー・パッチは自動マージする",
+      "description": "github-mcp-server は公開から 3 日経ったバージョンだけを対象にする",
       "matchDepNames": [
         "github/github-mcp-server"
       ],
-      "minimumReleaseAge": "3 days",
-      "semanticCommitType": "fix",
-      "semanticCommitScope": "deps"
+      "minimumReleaseAge": "3 days"
     },
     {
       "matchDepNames": [
@@ -34,7 +31,8 @@
         "minor",
         "patch"
       ],
-      "automerge": true
+      "automerge": true,
+      "description": "github-mcp-server のマイナー・パッチの更新は自動マージする"
     }
   ]
 }

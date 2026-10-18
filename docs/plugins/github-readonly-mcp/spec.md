@@ -92,19 +92,17 @@ Windows（ARM）は対象外とします。
 
 ```mermaid
 flowchart TD
-  A["main へのマージ<br/>（メンテナーの PR / Renovate の PR）"] --> B["release-please が<br/>リリース PR を作成"]
-  B --> C["リリース PR を自動マージ"]
-  C --> D["release-please が<br/>タグと GitHub Release を作成"]
-  D --> E["GitHub Actions が OS ごとの zip を作成し<br/>Release に添付"]
-  E --> F["marketplace.json の URL と sha256 を更新する<br/>PR を作成"]
-  F --> G["メンテナーが承認してマージ"]
-  G --> H["自動更新を ON にした利用者に配信"]
+  A["main へのマージ<br/>（メンテナーの PR / Renovate の PR）"] --> B["GitHub Actions が OS ごとの zip を作成・検証し<br/>GitHub Release に添付"]
+  B --> C["marketplace.json の URL と sha256 を更新する<br/>PR を作成"]
+  C --> D["メンテナーが承認してマージ"]
+  D --> E["自動更新を ON にした利用者に配信"]
 ```
 
 | 項目                 | 方針                                                                                                                                       |
 | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| バージョン管理       | release-please で管理する。コミットメッセージは Conventional Commits 形式とし、`fix:` でパッチ、`feat:` でマイナーのバージョンを上げる   |
-| リリース PR          | 常に自動マージする。変更内容のレビューは、main へマージする前の各 PR で行う                                                               |
+| リリースの単位       | `plugins/github-readonly/` 配下の変更が main に入るたびにリリースする。変更内容のレビューは、main へマージする前の各 PR で行う |
+| バージョン           | 日付とコミットから機械的に決める（例：`2026.10.18-abc1234`）。配信の前に必ずメンテナーの承認が入るため、リリース専用の PR やバージョン管理ツールは使わない |
+| リリースノート       | GitHub の自動生成機能で作る。配信を承認するときは、marketplace.json の PR にある差分リンクで実際のコードの変更を確認する |
 | marketplace.json     | zip を公開した後に、更新用の PR を作る。公開前の zip を指す状態を作らないため。PR では zip の sha256 と中身を自動で検証する。未マージの古い PR は、新しい PR を作るときに自動で閉じる（後からマージして配信中のバージョンが巻き戻るのを防ぐため） |
 | 配信の承認           | marketplace.json の変更はメンテナーの承認を必須にする。リポジトリへの書き込み権限を持つトークンが漏れても、利用者に届く zip を勝手に差し替えられないようにするため |
 
@@ -116,7 +114,7 @@ flowchart TD
 | 待機期間           | 公開から 3 日経ったバージョンだけを対象にする。公開直後の不具合修正リリースを待つため                                                |
 | 自動チェック       | PR ごとに、新しい実行ファイルが読み取り専用モードで書き込み系ツールを 1 つも提供しないことを機械的に確認する                         |
 | マージ             | マイナー・パッチの更新は、自動チェックが通れば自動マージする。メジャーの更新は、仕様変更の可能性があるためメンテナーが確認してマージする |
-| リリース           | Renovate のコミットは `fix(deps):` 形式とし、4.1 の流れでパッチリリースされる。利用者への配信には 4.1 のとおりメンテナーの承認が必要 |
+| リリース           | Renovate の PR がマージされると、4.1 の流れでリリースされる。利用者への配信には 4.1 のとおりメンテナーの承認が必要 |
 
 ### 4.3 利用者への配信
 
@@ -135,7 +133,7 @@ flowchart TD
 
 | 項目                       | 内容                                                                                                                                                         |
 | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| リリース用 GitHub App      | GitHub Actions が標準で使うトークン（`GITHUB_TOKEN`）による操作では後続のワークフローが起動しないため、リリース PR の作成とマージには専用の GitHub App を使う。App には Contents・Pull requests・Issues の読み書き権限を与え、Client ID をリポジトリの Variables（`RELEASE_APP_CLIENT_ID`）に、秘密鍵を Secrets（`RELEASE_APP_PRIVATE_KEY`）に登録する |
+| GitHub Actions による PR の作成 | marketplace.json を更新する PR を GitHub Actions の標準トークン（`GITHUB_TOKEN`）で作るため、リポジトリ設定（Settings > Actions > General）で「Allow GitHub Actions to create and approve pull requests」を有効にする |
 | Renovate                   | Mend Renovate の GitHub App をこのリポジトリにインストールする                                                                                                |
-| main ブランチの保護        | main にルールセットを設定し、PR 経由の変更だけを許可したうえで、Code Owners のレビューを必須にする。`.github/CODEOWNERS` で marketplace.json、ワークフロー、CODEOWNERS 自体のオーナーをメンテナーにしているため、これらを変更する PR だけがメンテナーの承認を必要とし、リリース PR と github-mcp-server を更新する Renovate の PR は自動マージのまま動く。PR の作成者は自分の PR を承認できないため、ルールセットはこれらのファイルを追加する PR をマージした後に有効にする |
+| main ブランチの保護        | main にルールセットを設定し、PR 経由の変更だけを許可したうえで、Code Owners のレビューを必須にする。`.github/CODEOWNERS` で marketplace.json、ワークフロー、CODEOWNERS 自体のオーナーをメンテナーにしているため、これらを変更する PR だけがメンテナーの承認を必要とし、github-mcp-server を更新する Renovate の PR は自動マージのまま動く。PR の作成者は自分の PR を承認できないため、ルールセットはこれらのファイルを追加する PR をマージした後に有効にする |
 | GitHub 組織での OAuth アプリの承認 | 組織の非公開リポジトリを参照する場合、組織のオーナーが、github-mcp-server の公式実行ファイルに組み込まれた OAuth アプリを承認する。承認すると組織のメンバーがこのアプリに `repo` スコープなどを渡せるようになるため、組織のセキュリティ担当と相談したうえで判断する。SAML SSO を使う組織では、メンバーごとにトークンの SSO 承認も必要 |

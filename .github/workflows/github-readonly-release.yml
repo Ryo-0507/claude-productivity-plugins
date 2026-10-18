@@ -14,68 +14,41 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  release-please:
-    runs-on: ubuntu-latest
-    outputs:
-      release_created: ${{ steps.release.outputs['plugins/github-readonly--release_created'] }}
-      tag_name: ${{ steps.release.outputs['plugins/github-readonly--tag_name'] }}
-      version: ${{ steps.release.outputs['plugins/github-readonly--version'] }}
-    steps:
-      # GITHUB_TOKEN で作成・マージした PR やタグでは後続のワークフローが起動しないため、GitHub App のトークンを使う
-      - uses: actions/create-github-app-token@v3
-        id: app-token
-        with:
-          client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
-          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
-
-      - uses: googleapis/release-please-action@v5
-        id: release
-        with:
-          token: ${{ steps.app-token.outputs.token }}
-
-      - name: リリース PR を自動マージする
-        if: steps.release.outputs.prs_created == 'true'
-        env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
-          PR_NUMBER: ${{ fromJSON(steps.release.outputs.pr).number }}
-        run: gh pr merge "$PR_NUMBER" --squash --repo "$GITHUB_REPOSITORY"
-
   publish:
-    needs: release-please
-    if: needs.release-please.outputs.release_created == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      pull-requests: write
     env:
-      TAG: ${{ needs.release-please.outputs.tag_name }}
-      VERSION: ${{ needs.release-please.outputs.version }}
+      GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: ${{ needs.release-please.outputs.tag_name }}
           persist-credentials: false
 
+      # バージョンは日付とコミットで機械的に決める（Claude Code はプラグインの version を semver として検査しない）
+      - name: バージョンとタグを決める
+        run: |
+          version="$(date -u +%Y.%m.%d)-${GITHUB_SHA::7}"
+          echo "VERSION=${version}" >> "$GITHUB_ENV"
+          echo "TAG=github-readonly-${version}" >> "$GITHUB_ENV"
+
       - name: OS 別の zip をビルドする（公式のチェックサムとビルド来歴の証明を検証）
-        env:
-          GH_TOKEN: ${{ github.token }}
         run: python3 plugins/github-readonly/tools/build.py build --out dist --version "$VERSION" --verify-attestations
 
-      - name: zip をリリースに添付する
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: gh release upload "$TAG" dist/*.zip --repo "$GITHUB_REPOSITORY"
+      - name: github-mcp-server が読み取り専用ツールだけを提供することを確認する
+        run: python3 plugins/github-readonly/tools/build.py verify-readonly --verify-attestations
 
-      # marketplace.json の変更はメンテナーの承認を必須にするため、main へ直接 push せず PR を作る
-      - uses: actions/create-github-app-token@v3
-        id: app-token
-        with:
-          client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
-          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+      - name: GitHub Release を作り、zip を添付する
+        run: |
+          gh release create "$TAG" dist/*.zip --repo "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" --title "$TAG" --generate-notes
 
+      # marketplace.json の変更はメンテナーの承認を必須にするため、main へ直接 push せず PR を作る。
+      # GITHUB_TOKEN で作った PR ではチェックのワークフローがすぐに動かないため、PR を作る前にここで検証する
       - name: marketplace.json を更新する PR を作る
         env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
-          BRANCH: marketplace/${{ needs.release-please.outputs.tag_name }}
+          BRANCH: marketplace/${{ env.TAG }}
         run: |
           git fetch origin main
           git checkout -B "$BRANCH" origin/main
@@ -84,6 +57,7 @@ jobs:
             --dist dist --repo "$GITHUB_REPOSITORY" --tag "$TAG" > "$RUNNER_TEMP/pr-body.md"
           python3 plugins/github-readonly/tools/build.py update-marketplace \
             --dist dist --repo "$GITHUB_REPOSITORY" --tag "$TAG"
+          python3 plugins/github-readonly/tools/build.py verify-marketplace
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add .claude-plugin/marketplace.json
@@ -95,11 +69,10 @@ jobs:
       # 古いバージョンの PR を後からマージすると配信中のバージョンが巻き戻るため、新しい PR で置き換えたものは閉じる
       - name: 未マージの古い marketplace.json 更新 PR を閉じる
         env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
-          BRANCH: marketplace/${{ needs.release-please.outputs.tag_name }}
+          BRANCH: marketplace/${{ env.TAG }}
         run: |
           gh pr list --repo "$GITHUB_REPOSITORY" --state open --base main --json number,headRefName \
-            --jq ".[] | select(.headRefName | startswith(\"marketplace/github-readonly-v\")) | select(.headRefName != \"${BRANCH}\") | .number" |
+            --jq ".[] | select(.headRefName | startswith(\"marketplace/github-readonly-\")) | select(.headRefName != \"${BRANCH}\") | .number" |
           while read -r number; do
             gh pr close "$number" --repo "$GITHUB_REPOSITORY" --delete-branch \
               --comment "新しいリリース ${TAG} の PR に置き換えたため閉じます。"
