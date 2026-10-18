@@ -12,7 +12,6 @@ Python の標準ライブラリだけで動作する。
 """
 
 import argparse
-import base64
 import hashlib
 import io
 import json
@@ -42,21 +41,18 @@ PLATFORMS = {
         "description": "【Windows用】GitHubのリポジトリを読み取り専用で参照する。GitHub公式のgithub-mcp-serverを同梱（GitHubによる提供ではありません）",
         "asset": "github-mcp-server_Windows_x86_64.zip",
         "binary": "github-mcp-server.exe",
-        "hook_shell": "powershell",
     },
     "mac-apple-silicon": {
         "plugin_name": "github-readonly-mac-apple-silicon",
         "description": "【Mac・Appleシリコン用（「このMacについて」に「チップ」と表示される方）】GitHubのリポジトリを読み取り専用で参照する。GitHub公式のgithub-mcp-serverを同梱（GitHubによる提供ではありません）",
         "asset": "github-mcp-server_Darwin_arm64.tar.gz",
         "binary": "github-mcp-server",
-        "hook_shell": "bash",
     },
     "mac-intel": {
         "plugin_name": "github-readonly-mac-intel",
         "description": "【Mac・Intel用（「このMacについて」に「プロセッサ」と表示される方）】GitHubのリポジトリを読み取り専用で参照する。GitHub公式のgithub-mcp-serverを同梱（GitHubによる提供ではありません）",
         "asset": "github-mcp-server_Darwin_x86_64.tar.gz",
         "binary": "github-mcp-server",
-        "hook_shell": "bash",
     },
 }
 
@@ -143,33 +139,6 @@ def fetch_third_party_licenses(version: str) -> dict:
     return files
 
 
-def hooks_config(shell: str) -> dict:
-    """deny-rules.json から、指定したシェル向けの hooks.json の内容を作る。"""
-    rules = json.loads((SOURCE_DIR / "hooks" / "deny-rules.json").read_text(encoding="utf-8"))
-    reason = rules["reason"]
-    if "'" in reason:
-        raise SystemExit("deny-rules.json の reason にシングルクォートは使えません")
-    if shell == "powershell":
-        # PowerShell のスクリプトやコンソールの文字コードで日本語が化けないよう、
-        # メッセージは UTF-8 を Base64 にして埋め込み、バイト列のまま標準エラー出力に書き込む
-        encoded = base64.b64encode(reason.encode("utf-8")).decode("ascii")
-        command = (f"$b = [Convert]::FromBase64String('{encoded}'); "
-                   "[Console]::OpenStandardError().Write($b, 0, $b.Length); exit 2")
-    else:
-        command = f"echo '{reason}' >&2; exit 2"
-
-    handlers = []
-    for tool in ("Bash", "PowerShell"):
-        for pattern in rules["commands"]:
-            handlers.append({
-                "type": "command",
-                "if": f"{tool}({pattern})",
-                "command": command,
-                "shell": shell,
-            })
-    return {"hooks": {"PreToolUse": [{"matcher": "Bash|PowerShell", "hooks": handlers}]}}
-
-
 def plugin_files(platform: dict, upstream: dict, third_party: dict, version: str) -> dict:
     """zip に格納する {パス: (中身, 実行可能か)} を返す。"""
     binary = platform["binary"]
@@ -189,16 +158,16 @@ def plugin_files(platform: dict, upstream: dict, third_party: dict, version: str
                 },
             },
         }, indent=2),
-        "hooks/hooks.json": json.dumps(hooks_config(platform["hook_shell"]), indent=2),
         f"mcp-server/{binary}": (upstream[binary], True),
         "LICENSE": (REPO_ROOT / "LICENSE").read_bytes(),
         f"{LICENSES_DIR}/LICENSE": upstream["LICENSE"],
     }
     for name, content in third_party.items():
         files[f"{LICENSES_DIR}/{name}"] = content
-    for path in sorted((SOURCE_DIR / "skills").rglob("*")):
-        if path.is_file():
-            files[path.relative_to(SOURCE_DIR).as_posix()] = path.read_bytes()
+    for directory in ("skills", "hooks"):
+        for path in sorted((SOURCE_DIR / directory).rglob("*")):
+            if path.is_file():
+                files[path.relative_to(SOURCE_DIR).as_posix()] = path.read_bytes()
 
     normalized = {}
     for name, content in files.items():
