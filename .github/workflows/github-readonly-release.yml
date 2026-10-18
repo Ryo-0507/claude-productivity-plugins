@@ -26,7 +26,7 @@ jobs:
         with:
           persist-credentials: false
 
-      # バージョンは日付とコミットで機械的に決める（Claude Code はプラグインの version を semver として検査しない）
+      # バージョンは日付とコミットで機械的に決める
       - name: バージョンとタグを決める
         run: |
           version="$(date -u +%Y.%m.%d)-${GITHUB_SHA::7}"

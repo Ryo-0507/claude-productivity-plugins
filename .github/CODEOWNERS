@@ -1,4 +1,6 @@
-# 利用者への配信（marketplace.json）と、リリースの仕組み（ワークフロー）の変更にはメンテナーの承認を必須にする
-/.claude-plugin/marketplace.json @Ryo-0507
-/.github/workflows/ @Ryo-0507
-/.github/CODEOWNERS @Ryo-0507
+# リポジトリへの変更には、原則としてメンテナーの承認を必須にする
+* @Ryo-0507
+
+# github-readonly プラグインの中身はオーナーを指定せず、github-mcp-server を更新する Renovate の PR を承認なしで自動マージできるようにする。
+# 利用者への配信（marketplace.json の更新）には上の指定で承認が必要になるため、ここが承認なしで変わっても利用者には届かない
+/plugins/github-readonly/
