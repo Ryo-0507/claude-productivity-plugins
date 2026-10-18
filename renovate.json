@@ -3,6 +3,7 @@
   "extends": [
     "config:recommended"
   ],
+  "semanticCommits": "enabled",
   "customManagers": [
     {
       "customType": "regex",
@@ -17,11 +18,13 @@
   ],
   "packageRules": [
     {
-      "description": "github-mcp-server は公開から 3 日経ったバージョンだけを対象にする",
+      "description": "github-mcp-server は公開から 3 日経ったバージョンだけを対象にし、コミットは fix(deps): 形式にする",
       "matchDepNames": [
         "github/github-mcp-server"
       ],
-      "minimumReleaseAge": "3 days"
+      "minimumReleaseAge": "3 days",
+      "semanticCommitType": "fix",
+      "semanticCommitScope": "deps"
     },
     {
       "matchDepNames": [
