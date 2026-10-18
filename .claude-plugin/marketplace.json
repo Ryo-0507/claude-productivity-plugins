@@ -6,5 +6,33 @@
   "metadata": {
     "description": "業務効率化のための Claude Code プラグイン集"
   },
-  "plugins": []
+  "plugins": [
+    {
+      "name": "github-readonly-windows",
+      "description": "【Windows用】GitHubのリポジトリを読み取り専用で参照する。GitHub公式のgithub-mcp-serverを同梱（GitHubによる提供ではありません）",
+      "source": {
+        "source": "archive",
+        "url": "https://github.com/Ryo-0507/claude-productivity-plugins/releases/download/github-readonly-2026.10.18-987cfeb/github-readonly-windows.zip",
+        "sha256": "acd6957a01231508fd886f22a61ff2d134f1b995671b125fd9932022e634fa72"
+      }
+    },
+    {
+      "name": "github-readonly-mac-apple-silicon",
+      "description": "【Mac・Appleシリコン用（「このMacについて」に「チップ」と表示される方）】GitHubのリポジトリを読み取り専用で参照する。GitHub公式のgithub-mcp-serverを同梱（GitHubによる提供ではありません）",
+      "source": {
+        "source": "archive",
+        "url": "https://github.com/Ryo-0507/claude-productivity-plugins/releases/download/github-readonly-2026.10.18-987cfeb/github-readonly-mac-apple-silicon.zip",
+        "sha256": "567b28ff0b2b3e92b12f655dd405f4d6ba756817c0eb04fc3cb74975a480b796"
+      }
+    },
+    {
+      "name": "github-readonly-mac-intel",
+      "description": "【Mac・Intel用（「このMacについて」に「プロセッサ」と表示される方）】GitHubのリポジトリを読み取り専用で参照する。GitHub公式のgithub-mcp-serverを同梱（GitHubによる提供ではありません）",
+      "source": {
+        "source": "archive",
+        "url": "https://github.com/Ryo-0507/claude-productivity-plugins/releases/download/github-readonly-2026.10.18-987cfeb/github-readonly-mac-intel.zip",
+        "sha256": "047381774877dfb32581259b8452884a4517cf31598ba7fc1fa3575f606c25bb"
+      }
+    }
+  ]
 }
