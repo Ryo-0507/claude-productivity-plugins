@@ -22,13 +22,13 @@ jobs:
       version: ${{ steps.release.outputs['plugins/github-readonly--version'] }}
     steps:
       # GITHUB_TOKEN で作成・マージした PR やタグでは後続のワークフローが起動しないため、GitHub App のトークンを使う
-      - uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+      - uses: actions/create-github-app-token@v3
         id: app-token
         with:
           client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
           private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
 
-      - uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
+      - uses: googleapis/release-please-action@v5
         id: release
         with:
           token: ${{ steps.app-token.outputs.token }}
@@ -50,7 +50,7 @@ jobs:
       TAG: ${{ needs.release-please.outputs.tag_name }}
       VERSION: ${{ needs.release-please.outputs.version }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@v7
         with:
           ref: ${{ needs.release-please.outputs.tag_name }}
           persist-credentials: false
@@ -66,7 +66,7 @@ jobs:
         run: gh release upload "$TAG" dist/*.zip --repo "$GITHUB_REPOSITORY"
 
       # marketplace.json の変更はメンテナーの承認を必須にするため、main へ直接 push せず PR を作る
-      - uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+      - uses: actions/create-github-app-token@v3
         id: app-token
         with:
           client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
