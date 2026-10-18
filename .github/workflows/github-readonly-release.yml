@@ -33,11 +33,10 @@ jobs:
           echo "VERSION=${version}" >> "$GITHUB_ENV"
           echo "TAG=github-readonly-${version}" >> "$GITHUB_ENV"
 
-      - name: OS 別の zip をビルドする（公式のチェックサムとビルド来歴の証明を検証）
-        run: python3 plugins/github-readonly/tools/build.py build --out dist --version "$VERSION" --verify-attestations
-
-      - name: github-mcp-server が読み取り専用ツールだけを提供することを確認する
-        run: python3 plugins/github-readonly/tools/build.py verify-readonly --verify-attestations
+      - name: zip をビルドし、配布してよい内容かを検証する
+        uses: ./.github/actions/github-readonly-build
+        with:
+          version: ${{ env.VERSION }}
 
       - name: GitHub Release を作り、zip を添付する
         run: |

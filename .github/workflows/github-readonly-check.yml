@@ -5,12 +5,14 @@ on:
     paths:
       - plugins/github-readonly/**
       - .github/workflows/github-readonly-*
+      - .github/actions/github-readonly-*/**
       - .claude-plugin/marketplace.json
   push:
     branches: [main]
     paths:
       - plugins/github-readonly/**
       - .github/workflows/github-readonly-*
+      - .github/actions/github-readonly-*/**
       - .claude-plugin/marketplace.json
 
 permissions:
@@ -24,15 +26,8 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: OS 別の zip をビルドする（公式のチェックサムとビルド来歴の証明を検証）
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: python3 plugins/github-readonly/tools/build.py build --out dist --verify-attestations
-
-      - name: github-mcp-server が読み取り専用ツールだけを提供することを確認する
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: python3 plugins/github-readonly/tools/build.py verify-readonly --verify-attestations
+      - name: zip をビルドし、配布してよい内容かを検証する
+        uses: ./.github/actions/github-readonly-build
 
       - name: marketplace.json が指す zip の sha256 と中身を確認する
         run: python3 plugins/github-readonly/tools/build.py verify-marketplace
