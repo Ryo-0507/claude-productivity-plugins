@@ -1,0 +1,78 @@
+name: github-readonly-release
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - plugins/github-readonly/**
+
+permissions:
+  contents: read
+
+concurrency:
+  group: github-readonly-release
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      # バージョンは日付とコミットで機械的に決める
+      - name: バージョンとタグを決める
+        run: |
+          version="$(date -u +%Y.%m.%d)-${GITHUB_SHA::7}"
+          echo "VERSION=${version}" >> "$GITHUB_ENV"
+          echo "TAG=github-readonly-${version}" >> "$GITHUB_ENV"
+
+      - name: zip をビルドし、配布してよい内容かを検証する
+        uses: ./.github/actions/github-readonly-build
+        with:
+          version: ${{ env.VERSION }}
+
+      - name: GitHub Release を作り、zip を添付する
+        run: |
+          gh release create "$TAG" dist/*.zip --repo "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" --title "$TAG" --generate-notes
+
+      # marketplace.json の変更はメンテナーの承認を必須にするため、main へ直接 push せず PR を作る。
+      # GITHUB_TOKEN で作った PR ではチェックのワークフローがすぐに動かないため、PR を作る前にここで検証する
+      - name: marketplace.json を更新する PR を作る
+        env:
+          BRANCH: marketplace/${{ env.TAG }}
+        run: |
+          git fetch origin main
+          git checkout -B "$BRANCH" origin/main
+          # PR 本文の差分リンクには、更新前の marketplace.json にある配信中のタグを使う
+          python3 plugins/github-readonly/tools/build.py marketplace-pr-body \
+            --dist dist --repo "$GITHUB_REPOSITORY" --tag "$TAG" > "$RUNNER_TEMP/pr-body.md"
+          python3 plugins/github-readonly/tools/build.py update-marketplace \
+            --dist dist --repo "$GITHUB_REPOSITORY" --tag "$TAG"
+          python3 plugins/github-readonly/tools/build.py verify-marketplace
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .claude-plugin/marketplace.json
+          git commit -m "chore(marketplace): publish ${TAG}"
+          git push "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "HEAD:refs/heads/${BRANCH}"
+          gh pr create --repo "$GITHUB_REPOSITORY" --base main --head "$BRANCH" \
+            --title "chore(marketplace): publish ${TAG}" --body-file "$RUNNER_TEMP/pr-body.md"
+
+      # 古いバージョンの PR を後からマージすると配信中のバージョンが巻き戻るため、新しい PR で置き換えたものは閉じる
+      - name: 未マージの古い marketplace.json 更新 PR を閉じる
+        env:
+          BRANCH: marketplace/${{ env.TAG }}
+        run: |
+          gh pr list --repo "$GITHUB_REPOSITORY" --state open --base main --json number,headRefName \
+            --jq ".[] | select(.headRefName | startswith(\"marketplace/github-readonly-\")) | select(.headRefName != \"${BRANCH}\") | .number" |
+          while read -r number; do
+            gh pr close "$number" --repo "$GITHUB_REPOSITORY" --delete-branch \
+              --comment "新しいリリース ${TAG} の PR に置き換えたため閉じます。"
+          done

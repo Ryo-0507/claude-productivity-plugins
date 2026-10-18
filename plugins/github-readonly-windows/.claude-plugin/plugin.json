@@ -1,8 +1,0 @@
-{
-  "name": "github-readonly-windows",
-  "version": "0.1.0",
-  "description": "GitHub公式MCPサーバーを起動し、OAuthでログインします。",
-  "author": {
-    "name": "Ryo"
-  }
-}

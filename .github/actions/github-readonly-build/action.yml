@@ -1,0 +1,27 @@
+name: github-readonly-build
+description: github-readonly プラグインの OS 別 zip をビルドし、配布してよい内容かを検証する（チェックとリリースの両方のワークフローで使う）
+
+inputs:
+  version:
+    description: プラグインのバージョン
+    default: 0.0.0-dev
+  out:
+    description: zip の出力先ディレクトリ
+    default: dist
+
+runs:
+  using: composite
+  steps:
+    - name: OS 別の zip をビルドする（公式のチェックサムとビルド来歴の証明を検証）
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+        VERSION: ${{ inputs.version }}
+        OUT: ${{ inputs.out }}
+      run: python3 plugins/github-readonly/tools/build.py build --out "$OUT" --version "$VERSION" --verify-attestations
+
+    - name: github-mcp-server が読み取り専用ツールだけを提供することを確認する
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: python3 plugins/github-readonly/tools/build.py verify-readonly --verify-attestations

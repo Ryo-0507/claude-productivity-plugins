@@ -1,0 +1,33 @@
+name: github-readonly-check
+
+on:
+  pull_request:
+    paths:
+      - plugins/github-readonly/**
+      - .github/workflows/github-readonly-*
+      - .github/actions/github-readonly-*/**
+      - .claude-plugin/marketplace.json
+  push:
+    branches: [main]
+    paths:
+      - plugins/github-readonly/**
+      - .github/workflows/github-readonly-*
+      - .github/actions/github-readonly-*/**
+      - .claude-plugin/marketplace.json
+
+permissions:
+  contents: read
+
+jobs:
+  github-readonly:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: zip をビルドし、配布してよい内容かを検証する
+        uses: ./.github/actions/github-readonly-build
+
+      - name: marketplace.json が指す zip の sha256 と中身を確認する
+        run: python3 plugins/github-readonly/tools/build.py verify-marketplace
