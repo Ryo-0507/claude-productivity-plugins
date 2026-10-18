@@ -29,7 +29,16 @@ MARKETPLACE_JSON = REPO_ROOT / ".claude-plugin" / "marketplace.json"
 UPSTREAM_REPO = "github/github-mcp-server"
 MCP_SERVER_NAME = "github"
 # 利用者の PC での起動と CI での検査の両方で使う、github-mcp-server の起動引数
-MCP_SERVER_ARGS = ["stdio", "--read-only"]
+MCP_SERVER_ARGS = [
+    "stdio",
+    "--read-only",
+    # 使うツールセットを明示し、上流の既定値が変わっても勝手にツールが増えないようにする
+    "--toolsets", "context,repos,issues,pull_requests",
+    # OAuth で要求する権限を最小限にする（使えないツールは自動で隠れる）
+    "--oauth-scopes", "repo,read:org",
+    # 公開リポジトリで、push 権限のない人が書いたイシューやコメントを隠す（プロンプトインジェクション対策）
+    "--lockdown-mode",
+]
 # github-mcp-server の公式リリースを作るワークフロー（ビルド来歴の検証に使う）
 UPSTREAM_SIGNER_WORKFLOW = f"{UPSTREAM_REPO}/.github/workflows/goreleaser.yml"
 # github-mcp-server のライセンス一式を置く、zip 内（プラグインのルートからの）パス
