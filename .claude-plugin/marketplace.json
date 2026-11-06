@@ -12,8 +12,8 @@
       "description": "【Windows用】GitHubのリポジトリを読み取り専用で参照する。GitHub公式のgithub-mcp-serverを同梱（GitHubによる提供ではありません）",
       "source": {
         "source": "archive",
-        "url": "https://github.com/Ryo-0507/claude-productivity-plugins/releases/download/github-readonly-2026.11.01-bbb765b/github-readonly-windows.zip",
-        "sha256": "13696e759441bb42943ad2150a6582ff1e70d517240192f57e5d465ee63e594f"
+        "url": "https://github.com/Ryo-0507/claude-productivity-plugins/releases/download/github-readonly-2026.11.06-6006ca2/github-readonly-windows.zip",
+        "sha256": "f7c5645835fddbd21b7e0e52171f24793d1fab2e91592f9deab2c5787923e33c"
       }
     },
     {
@@ -21,8 +21,8 @@
       "description": "【Mac・Appleシリコン用（「このMacについて」に「チップ」と表示される方）】GitHubのリポジトリを読み取り専用で参照する。GitHub公式のgithub-mcp-serverを同梱（GitHubによる提供ではありません）",
       "source": {
         "source": "archive",
-        "url": "https://github.com/Ryo-0507/claude-productivity-plugins/releases/download/github-readonly-2026.11.01-bbb765b/github-readonly-mac-apple-silicon.zip",
-        "sha256": "bd3b292e133d7223304ef4521bc74ec7cb95ce45881fe2d1b153a52beaf15545"
+        "url": "https://github.com/Ryo-0507/claude-productivity-plugins/releases/download/github-readonly-2026.11.06-6006ca2/github-readonly-mac-apple-silicon.zip",
+        "sha256": "a8928de688bb5fda45149fae9b7e7787800295e6217afefc04322121fe7024bf"
       }
     },
     {
@@ -30,8 +30,8 @@
       "description": "【Mac・Intel用（「このMacについて」に「プロセッサ」と表示される方）】GitHubのリポジトリを読み取り専用で参照する。GitHub公式のgithub-mcp-serverを同梱（GitHubによる提供ではありません）",
       "source": {
         "source": "archive",
-        "url": "https://github.com/Ryo-0507/claude-productivity-plugins/releases/download/github-readonly-2026.11.01-bbb765b/github-readonly-mac-intel.zip",
-        "sha256": "61d35d9ab5646a271d9a44d4943130ac862ce6ab66cf614fec928a382d266616"
+        "url": "https://github.com/Ryo-0507/claude-productivity-plugins/releases/download/github-readonly-2026.11.06-6006ca2/github-readonly-mac-intel.zip",
+        "sha256": "09714472f673ee46140dd813089678c2f6c6e12a2dc30d3ccdfc09eac1661f23"
       }
     }
   ]
